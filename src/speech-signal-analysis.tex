@@ -1,0 +1,81 @@
+\wde{Dithering}{
+    Dithering adds noise to the signal which avoids the signal 
+    having zeros (which may be problematic when taking the log).
+    \begin{equation*}
+        y[t] = x[t] + \epsilon[t] \quad\quad \epsilon[t] \sim \mathcal{N}(0, \sigma^2)
+    \end{equation*}
+}
+
+\wde{DC Offset}{
+    Most processing techniques assume that the signal is centered around 0.
+    \begin{equation*}
+        y[t] = x[t] - \frac{1}{T} \mu_x \quad\quad \mu_x = \frac{1}{T} \sum_{t=1}^{T} x[t]
+    \end{equation*}
+}
+
+\wde{Pre-emphasis}{
+    Emphasize high frequency components.
+    \begin{equation*}
+        y[t] = x[t] - \alpha x[t-1]
+    \end{equation*}
+    where $\alpha$ is a constant (usually 0.97)
+}
+
+\wde{Discrete Fourier Transform (DFT)}{
+    The dot product of the signal with the sinusoids of the frequency (Fourier basis).
+    \begin{equation*}
+        X[k] = \sum_{t=0}^{T-1} x[t] e^{i 2 \pi k t / T}
+    \end{equation*}
+    DFT decomposes the signal into frequency components.
+    Commonly $\mathcal{F}$ is used to denote the DFT operator.
+}
+
+\wt{Properties of DFT}{
+    \begin{itemize}
+        \item Linearity: $\mathcal{F}(a_1 x_1 + a_2 x_2) = a_1 \mathcal{F}(x_1) + a_2 \mathcal{F}(x_2)$
+        \item Shift: If $y[t] = x[t-m]$, then $Y[k] = e^{i 2 \pi k m / T} X[k]$ % TODO: Prove
+    \end{itemize}
+}
+
+\wde{Windowing}{
+    Given a signal $x[t]$, a window function $w[t]$ (Hamming, Hann, etc.)
+    \begin{equation*}
+        y[t] = x[t] w[t]
+    \end{equation*}
+}
+
+\wde{Short-Time Fourier Transform (STFT)}{
+    Given a signal $x[t]$, a window function $w[t]$, and a hop size $h$, the STFT is given by:
+    \begin{equation*}
+        X[k, m] = \sum_{t=0}^{T-1} x[t] w[t-m] e^{-i 2 \pi k t / T}
+    \end{equation*}
+    where $m$ is the current frame index and $k$ is the frequency index.
+    This gives a complex spectrogram of the signal.
+}
+\wde{Complex Spectrogram}{
+Given a frequency bin $X[k] = a + bi$,
+\begin{itemize}
+    \item Real: $\mathcal{R}(X[k]) = a$
+    \item Imaginary: $\Im m(X[k]) = b$
+    \item Magnitude: $|X[k]| = \sqrt{a^2 + b^2}$
+    \item Phase: $\angle X[k] = \arccos\frac{a}{\sqrt{a^2 + b^2}}$
+    \item Energy: $P[k] = |X[k]|^2$
+\end{itemize}
+}
+
+\wde{Mel Spectrogram}{ % TODO: Check
+    After obtaining the spectrogram, $X[k]$, and using the mel filter bank, $H_n[k]$, the mel spectrogram is given by:
+    \begin{equation*}
+        Y[k, n] = \sum_{k=0}^{K-1} |X[k]| H_n[k]
+    \end{equation*}
+}
+
+\wde{Mel Frequency Cepstral Coefficients (MFCCs)}{
+    A common feature extraction technique for speech recognition 
+    which is able to capture speaker characteristics and phonetic content.
+    \begin{enumerate}
+        \item Extract the mel spectrogram $Y[k, n]$
+        \item Apply the Discrete Cosine Transform (DCT) to the mel spectrogram.
+        \item Take the first $p$ coefficients (usually 13).
+    \end{enumerate}
+}

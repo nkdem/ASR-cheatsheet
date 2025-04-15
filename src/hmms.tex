@@ -1,0 +1,61 @@
+\wde{Objective of ASR}{
+    Given a sequence of acoustic feature vectors $X$,
+    and $W$ denotes a word sequence, ASR aims to find the most likely word sequence $W^*$
+    \begin{equation*}
+        W^* = \argmax_{W} P(W | X)
+    \end{equation*}
+}
+
+\wc{Decomposition of $P(W | X)$}{
+    We can decompose $P(W | X)$ with Bayes' theorem:
+    \begin{equation*}
+        P(W | X) = \frac{P(X | W) P(W)}{P(X)} \propto P(X | W) P(W)
+    \end{equation*}
+    $P(X | W)$ is the \textbf{Acoustic Model} and $P(W)$ is the \textbf{Language Model}.
+}
+
+\wde{Modelling the Acoustic Model with HMMs}{
+    Commonly, the left-to-right HMM is used to model the acoustic model. 
+    As a word is composed of multiple phonemes, we can 
+    model each phoneme with a left-to-right HMM and then concatenate them to form a HMM for the word.
+    For the phoneme HMMs, we typically use a left-to-right HMM with 3 states 
+    which as a consequence also enforces a minimum phone duration.
+    % TODO: maybe add a diagram here
+}
+
+\wde{The three fundamental problems of HMMs}{
+    \begin{enumerate}
+        \item \textbf{Likelihood} - Determine the overall likelihood 
+        of an observation sequence $X = x_1, x_2, \ldots, x_T$ given an HMM topology $\mathcal{M}$
+        \item \textbf{Decoding} - Determine the most likely sequence of hidden states $Q = q_1, q_2, \ldots, q_T$
+        given an observation sequence $X = x_1, x_2, \ldots, x_T$ and an HMM topology $\mathcal{M}$
+        \item \textbf{Training} - Given an observation sequence $X = x_1, x_2, \ldots, x_T$ and an HMM topology $\mathcal{M}$,
+        determine the optimal state occupation probabilities.
+    \end{enumerate}
+}
+
+\wa{Forward Algorithm}{
+    The \textbf{Likelihood} problem is solved by the \textbf{Forward Algorithm}.
+    The forward probability $\alpha_j (t)$ is the probability of observing the observation sequence 
+    $x_1, \cdots, x_t$ and being in state $j$ at time $t$.
+    \begin{equation*}
+        \alpha_j (t) = P(x_1, \cdots, x_t, q_t = j | \mathcal{M})
+    \end{equation*}
+    This can be computed recursively:
+    \begin{itemize}
+        \item Initialisation:
+        \begin{align*}
+            \alpha_j (0) &= 1 \quad j = 0 \\
+            \alpha_j (0) &= 0 \quad j \neq 0
+        \end{align*}
+        \item Recursion:
+        \begin{equation*}
+            \alpha_j (t) = \left( \sum_{i=0}^{J} \alpha_i (t-1) a_{ij} \right) b_j (x_t)
+        \end{equation*}
+        \item Termination:
+        \begin{equation*}
+            P(X | \mathcal{M}) = \alpha_{E} = \sum_{i=1}^{J} \alpha_i (T) a_{iE}
+        \end{equation*}
+    \end{itemize}
+}
+    
