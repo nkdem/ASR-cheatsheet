@@ -133,6 +133,26 @@ $P(q_t = j | X, \mathcal{M})$. This can be reduced to a ratio of the forward and
 \end{align*}
 }
 
+\wde{Transition Occupation Probabibility}{
+    Similar to the state occupation probability, we can estimate the transition occupation probability, $\xi_{ij} (t)$ as 
+    the probability of transitioning from state $i$ to state $j$ at time $t$ given the observations.
+    This is combined by considering 4 cases:
+    \begin{enumerate}
+        \item Starting from the beginning of the sequence, generate observations $X_{1:t}$ and arrive in state $q_t = i$ (forward probability)
+        \item Transitioning from $q_t = i$ to state $q_{t+1} = j$ (after Markov assumption, this is the same as $a_{ij}$)
+        \item From $q_{t+1} = j$ generate observation $x_{t+1}$ (after Markov assumption, this is the same as $b_j (x_{t+1})$)
+        \item Generating the remaining observations $x_{t+2:T}$ (backward probability)
+    \end{enumerate}
+
+    This leads to the following equation:
+    \begin{align*}
+        \xi_{ij} (t) &= P(q_t = i, q_{t+1} = j | X, \mathcal{M})\\
+        &= \frac{P(q_t = i, q_{t+1} = j, X_{1:T} | \mathcal{M})}{P(X | \mathcal{M})}\\
+        &= \frac{P(X_{1:t}, q_t = i, q_{t+1} = j, X_{t+1:T} | \mathcal{M})}{\alpha_E}\\
+        &= \frac{\alpha_i (t) a_{ij} b_j (x_{t+1}) \beta_j (t+1)}{\alpha_E}
+    \end{align*}
+}
+
 \wa{Training: Soft Assignment with Baum-Welch Algorithm}{
     The issue is that 
 }
