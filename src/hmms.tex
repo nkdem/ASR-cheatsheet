@@ -1,3 +1,7 @@
+% ==================================================
+% == Section 1: ASR Fundamentals & HMM Basics ==
+% ==================================================
+
 \wde{Objective of ASR}{
     Given a sequence of acoustic feature vectors $X$,
     and $W$ denotes a word sequence, ASR aims to find the most likely word sequence $W^*$
@@ -11,233 +15,255 @@
     \begin{equation*}
         P(W | X) = \frac{P(X | W) P(W)}{P(X)} \propto P(X | W) P(W)
     \end{equation*}
-    $P(X | W)$ is the \textbf{Acoustic Model} and $P(W)$ is the \textbf{Language Model}.
+    $P(X | W)$ is the \textbf{Acoustic Model} (AM) and $P(W)$ is the \textbf{Language Model} (LM).
 }
 
 \wde{Modelling the Acoustic Model with HMMs}{
-    Commonly, the left-to-right HMM is used to model the acoustic model. 
-    As a word is composed of multiple phonemes, we can 
-    model each phoneme with a left-to-right HMM and then concatenate them to form a HMM for the word.
-    For the phoneme HMMs, we typically use a left-to-right HMM with 3 states 
-    which as a consequence also enforces a minimum phone duration.
-    % TODO: maybe add a diagram here
+    The AM $P(X|W)$ is typically modelled using Hidden Markov Models (HMMs).
+    Words are represented as sequences of phonemes. Each phoneme is often modelled by a left-to-right HMM, typically with 3 emitting states (enforcing a minimum phone duration).
+    Word HMMs are formed by concatenating the corresponding phoneme HMMs.
+    % TODO: maybe add a diagram here (e.g., from asr07 slide 4 or 7)
 }
 
-\wde{The three fundamental problems of HMMs}{
+\wde{The Three Fundamental Problems of HMMs}{
+    Given an HMM $\mathcal{M}$ and an observation sequence $X = x_1, \dots, x_T$:
     \begin{enumerate}
-        \item \textbf{Likelihood} - Determine the overall likelihood 
-        of an observation sequence $X = x_1, x_2, \ldots, x_T$ given an HMM topology $\mathcal{M}$: \[ P(X|\mathcal{M}) \]
-        \item \textbf{Decoding} - Determine the most likely sequence of hidden states $Q = q_1, q_2, \ldots, q_T$
-        given an observation sequence $X = x_1, x_2, \ldots, x_T$ and an HMM topology $\mathcal{M}$
-        \item \textbf{Training} - Given an observation sequence $X = x_1, x_2, \ldots, x_T$ and an HMM topology $\mathcal{M}$,
-        determine the optimal state occupation probabilities.
+        \item \textbf{Likelihood Problem:} Compute the total likelihood of the observation sequence: $P(X|\mathcal{M})$. (Solved by Forward Algorithm).
+        \item \textbf{Decoding Problem:} Find the most likely sequence of hidden states $Q^* = q_1, \dots, q_T$. (Solved by Viterbi Algorithm).
+        \item \textbf{Training Problem:} Adjust the HMM parameters $\lambda = \{A, B\}$ to maximize $P(X|\mathcal{M})$. (Solved by Baum-Welch/EM Algorithm or Viterbi Training).
     \end{enumerate}
 }
 
+% ==================================================
+% == Section 2: Core HMM Algorithms ==
+% ==================================================
 
-\wa{Forward Probability [$\alpha_j(t)$]}{
-    The \textbf{Likelihood} and \textbf{Training} problem rely on forward probabilities. 
-    The forward probability $\alpha_j (t)$ is the probability of observing the observation sequence 
-    $x_1, \cdots, x_t$ and being in state $j$ at time $t$.
-    This can be computed recursively:
+\wa{Forward Algorithm ($\alpha_j(t)$)}{
+    Solves the \textbf{Likelihood} problem and is a key part of the \textbf{Training} problem (E-step).
+    The forward probability $\alpha_j(t) = P(x_1, \dots, x_t, q_t = j | \mathcal{M})$ is the probability of observing the first $t$ observations and being in state $j$ at time $t$.
     \begin{itemize}
-        \item Initialisation:
+        \item Initialisation (using non-emitting start state $q_0$):
         \begin{align*}
-            \alpha_j (0) &= 1 \quad j = 0 \\
-            \alpha_j (0) &= 0 \quad j \neq 0
+            \alpha_0(0) &= 1 \\
+            \alpha_j(0) &= 0 \quad \text{for } j = 1, \dots, J
         \end{align*}
-        \item Recursion:
+        \item Recursion ($t = 1, \dots, T$; $j = 1, \dots, J$):
         \begin{equation*}
-            \alpha_j (t) = \left( \sum_{i=0}^{J} \alpha_i (t-1) a_{ij} \right) b_j (x_t)
+            \alpha_j(t) = \left[ \sum_{i=0}^{J} \alpha_i(t-1) a_{ij} \right] b_j(x_t)
         \end{equation*}
-        \item Termination:
+        \item Termination (using non-emitting end state $q_E$):
         \begin{equation*}
-            P(X | \mathcal{M}) = \alpha_{E} = \sum_{i=1}^{J} \alpha_i (T) a_{iE}
+            P(X | \mathcal{M}) = \alpha_{E}(T+1) = \sum_{i=1}^{J} \alpha_i(T) a_{iE}
         \end{equation*}
     \end{itemize}
 }
 
-\wa{Viterbi Algorithm}{
-    The \textbf{Decoding} problem is solved by the \textbf{Viterbi Algorithm}.
-    Define likelihood of the most probable partial path in state $j$ at time $t$ as $V_j (t)$
-    and the Viterbi backpointer as $B_j (t)$ (the most probable state at time $t-1$ that leads to state $j$ at time $t$).
-    Then the Viterbi algorithm can be described as:
+\wa{Viterbi Algorithm ($V_j(t), B_j(t)$)}{
+    Solves the \textbf{Decoding} problem by finding the single most probable state sequence $Q^*$.
+    $V_j(t)$ is the probability of the most probable path ending in state $j$ at time $t$.
+    $B_j(t)$ stores the previous state index on that most probable path.
     \begin{itemize}
         \item Initialisation:
         \begin{align*}
-            V_0 (0) &= 1\\
-            V_j (0) &= 0 \quad j \neq 0\\
-            B_j (0) &= 0
+            V_0(0) &= 1\\
+            V_j(0) &= 0 \quad \text{for } j = 1, \dots, J\\
+            B_j(0) &= 0 \quad \forall j
         \end{align*}
-        \item Recursion:
+        \item Recursion ($t = 1, \dots, T$; $j = 1, \dots, J$):
         \begin{align*}
-            V_j (t) &= \max_{i=0}^{J} V_i (t-1) a_{ij} b_j (x_t)\\
-            B_j (t) &= \argmax_{i=0}^{J} V_i (t-1) a_{ij}
+            V_j(t) &= \left[ \max_{i=1 \dots J} V_i(t-1) a_{ij} \right] b_j(x_t) \\ % Adjusted max range assuming emitting states 1..J
+            B_j(t) &= \argmax_{i=1 \dots J} V_i(t-1) a_{ij}
+            % Or use i=0..J if including transitions from start state directly
         \end{align*}
         \item Termination:
         \begin{align*}
-            V_E &= \max_{j=1}^{J} V_j (T) a_{jE}\\
-            B_E &= \argmax_{j=1}^{J} V_j (T) a_{jE}
+            P(X, Q^* | \mathcal{M}) = V_E &= \max_{i=1 \dots J} V_i(T) a_{iE} \\
+            q_T^* = B_E &= \argmax_{i=1 \dots J} V_i(T) a_{iE}
         \end{align*}
+        \item Backtracking: $q_{t}^* = B_{q_{t+1}^*}(t+1)$ for $t = T-1, \dots, 1$.
     \end{itemize}
 }
 
-\wa{Training: Hard Assignment with Viterbi Training}{
-    If we know the state-time alignment of the training data (i.e. the sequence of states that generated the observation sequence),
-    then the transition and observation probabilities can be estimated as follows:
-    \begin{align*}
-        a_{ij} &= \frac{C(i \to j)}{\sum_{k} C(i \to k)}\\
-        \mu_j &= \frac{\sum_{t} z_{jt} x_t}{\sum_{t} z_{jt}}\\
-        b_j &= \mathcal{N}(x_t | \mu_j, \Sigma_j) 
-    \end{align*}
-    where $z_{jt}$ is an indicator variable that is 1 if the $t$-th observation was generated by the $j$-th state.
-    $C(i \to j)$ is the number of times the transition from state $i$ to state $j$ is made.
-}
-\wde{Backward Probability [$\beta_j (t)$]}{
-    The backward probability $\beta_j(t) = P(x_{t+1}, \dots, x_T | q_t = j, \mathcal{M})$ is the probability of observing the observation sequence from time $t+1$ to the end, given that the HMM is in state $j$ at time $t$.
+\wde{Backward Algorithm ($\beta_j(t)$)}{
+    Needed for the E-step of Baum-Welch/EM \textbf{Training}.
+    The backward probability $\beta_j(t) = P(x_{t+1}, \dots, x_T | q_t = j, \mathcal{M})$ is the probability of observing the future observation sequence, given state $j$ at time $t$.
     \begin{itemize}
-        \item Initialisation:
+        \item Initialisation ($j = 1, \dots, J$):
         \begin{equation*}
-            \beta_j (T) = a_{jE}
+            \beta_j(T) = a_{jE} \quad \text{(Prob. of transitioning to end state E)}
         \end{equation*}
-        \item Recursion:
+        \item Recursion ($t = T-1, \dots, 1$; $i = 1, \dots, J$):
         \begin{equation*}
-            \beta_i (t) = \sum_{j=1}^{J} a_{ij} b_j (x_{t+1}) \beta_j (t+1)
+            \beta_i(t) = \sum_{j=1}^{J} a_{ij} b_j(x_{t+1}) \beta_j(t+1)
         \end{equation*}
-        \item Termination:
-        \begin{equation*}
-            P(X | \mathcal{M}) = \beta_0 (0) = \sum_{j=1}^{J} a_{0j} b_j (x_1) \beta_j (1) = \alpha_E
-        \end{equation*}
+        % Optional: Termination check
+        % \item Termination Check: $P(X | \mathcal{M}) = \sum_{j=1}^{J} a_{0j} b_j(x_1) \beta_j(1)$
     \end{itemize}
-
 }
 
-\wde{State Occupation Probability [$\gamma_j(t)$]}{
-$\gamma_j(t)$ is the probability of being in state $j$ at time $t$, given the complete observation sequence $X$ and the model $\mathcal{M}$. It combines forward and backward probabilities.
-\begin{align*}
-    \gamma_j (t) &= P(q_t = j | X, \mathcal{M})\\
-    &= \frac{P(q_t = j, X_{1:T} | \mathcal{M})}{P(X|M)}\\
-    &= \frac{P(q_t = j, X_{1:t}, X_{t+1:T} | \mathcal{M})}{\alpha_E} \\ % & \text{(Sub. and Exp.)} \\
-    &= \frac{P(X_{t+1:T} | q_t = j, X_{1:t}, \mathcal{M}) \times P(q_t = j, X_{1:t} | \mathcal{M})}{\alpha_E} \\ %& \text{(Chain rule)}\\
-    &= \frac{P(X_{t+1:T} | q_t = j, \mathcal{M}) \times P(q_t = j, X_{1:t} | \mathcal{M})}{\alpha_E} \\ %& \text{(Markov)}\\
-    &= \frac{\beta_j (t) \alpha_j (t)}{\alpha_E} \\%& \text{(Sub.)}
-\end{align*}
-This represents the expected proportion of time spent in state $j$ at time $t$. Note that $\sum_{j=1}^J \gamma_j(t) = 1$ for any $t$.
+% ==================================================
+% == Section 3: HMM Training ==
+% ==================================================
+
+\wa{Training Method 1: Viterbi Training (Hard Assignment)}{
+    A simpler approach to the \textbf{Training} problem. Uses the Viterbi algorithm to find the single best state alignment, then performs Maximum Likelihood Estimation based on that alignment.
+    \begin{enumerate}
+        \item \textbf{Alignment:} Run Viterbi with current parameters $\lambda^{\text{old}}$ to get $Q^*$. Define $z_{jt} = 1$ if $q_t^* = j$, else $0$.
+        \item \textbf{Re-estimation:} Calculate counts and update parameters $\lambda^{\text{new}}$.
+            \begin{align*}
+                \hat{a}_{ij}^{\text{new}} &= \frac{\text{Count}(q_t^*=i, q_{t+1}^*=j)}{\text{Count}(q_t^*=i)} \\
+                % Assuming single Gaussian output b_j for simplicity here
+                \hat{\boldsymbol{\mu}}_j^{\text{new}} &= \frac{\sum_{t: q_t^*=j} \mathbf{x}_t}{\text{Count}(q_t^*=j)} \\
+                \hat{\boldsymbol{\Sigma}}_j^{\text{new}} &= \frac{\sum_{t: q_t^*=j} (\mathbf{x}_t - \hat{\boldsymbol{\mu}}_j^{\text{new}})(\mathbf{x}_t - \hat{\boldsymbol{\mu}}_j^{\text{new}})^T}{\text{Count}(q_t^*=j)}
+            \end{align*}
+        \item Repeat until convergence.
+    \end{enumerate}
+    Note: Optimizes likelihood of the single best path, not the total likelihood $P(X|\mathcal{M})$. Often less accurate than EM.
 }
 
-\wde{Transition Occupation Probability ($\xi_{ij}(t)$)}{
-    $\xi_{ij}(t)$ is the probability of being in state $i$ at time $t$ and transitioning to state $j$ at time $t+1$, given the complete observation sequence $X$ and the model $\mathcal{M}$.
-    % \begin{enumerate}
-    %     \item Starting from the beginning of the sequence, generate observations $X_{1:t}$ and arrive in state $q_t = i$ (forward probability)
-    %     \item Transitioning from $q_t = i$ to state $q_{t+1} = j$ (after Markov assumption, this is the same as $a_{ij}$)
-    %     \item From $q_{t+1} = j$ generate observation $x_{t+1}$ (after Markov assumption, this is the same as $b_j (x_{t+1})$)
-    %     \item Generating the remaining observations $x_{t+2:T}$ (backward probability)
-    % \end{enumerate}
-
-    % This leads to the following equation:
-    \begin{align*}
-        \xi_{ij} (t) &= P(q_t = i, q_{t+1} = j | X, \mathcal{M})\\
-        &= \frac{P(q_t = i, q_{t+1} = j, X_{1:T} | \mathcal{M})}{P(X | \mathcal{M})}\\
-        &= \frac{P(X_{1:t}, q_t = i, q_{t+1} = j, X_{t+1:T} | \mathcal{M})}{\alpha_E}\\
-        &= \frac{\alpha_i (t) a_{ij} b_j (x_{t+1}) \beta_j (t+1)}{\alpha_E}
-    \end{align*}
+\wa{Training Method 2: Baum-Welch Algorithm (EM)}{
+    Solves the \textbf{Training} problem by maximizing the total likelihood $P(X|\mathcal{M})$ using Expectation-Maximization. It uses 'soft' assignments based on probabilities. Requires derived probabilities from the E-step.
 }
 
-
-
-% \wde{Modelling the transition probability}{
-%     With the transition occupation probability, we can estimate the transition probability as follows:
-%     \begin{align*}
-%         \hat a_{ij} &= \frac{\sum_{t=1}^{T-1} \xi_{ij} (t)}{\sum_{k=1}^{J} \sum_{t=1}^{T-1} \xi_{ik} (t)}
-%     \end{align*}
-%     This can be extended to corpus of $R$ utterances by summing (and normalizing) over all utterances:
-%     \begin{align*}
-%         \hat a_{ij} &= \frac{\sum_{r=1}^{R} \sum_{t=1}^{T} \xi_{i,j}^{r} (t)}{\sum_{r=1}^{R} \sum_{k=1}^{J} \sum_{t=1}^{T} \xi_{ik}^{r} (t)}
-%     \end{align*}
-% }
-
-% \wde{Modelling the observation probability I}{
-%     When we model the observation probability with a multivariate 
-%     Gaussian distribution we can use the occuption probabilities $\gamma_j$ 
-%     to estimate $\boldsymbol \mu_j$ and $\boldsymbol \Sigma_j$ as follows:
-%     \[
-%      \boldsymbol \mu_j = \frac{\sum_{t=1}^{T} \gamma_j (t) \boldsymbol x_t}{\sum_{t=1}^{T} \gamma_j (t)}, \quad
-%      \boldsymbol \Sigma_j = \frac{\sum_{t=1}^{T} \gamma_j (t) (\boldsymbol x_t - \boldsymbol \mu_j)(\boldsymbol x_t - \boldsymbol \mu_j)^T}{\sum_{t=1}^{T} \gamma_j (t)}
-%      \]
-%      Then assuming that the acoustic feature emitted at each state $j$ is Gaussian,
-%      then, $b_j (\boldsymbol x)$ is:
-%      \[
-%         b_j (\boldsymbol x) = \mathcal{N}(\boldsymbol x; \boldsymbol \mu_j, \boldsymbol \Sigma_j) 
-%      \]
-% }
-
-% \wde{Modelling the observation probability II}{
-%     The assumption of a Gaussian Distribution at each state 
-%     is too \textbf{strong}, and in practice acoustic feature vectors (MFCCs etc.) 
-%     associated with a state may be strongly non-Gaussian. As such, 
-%     M-component Gaussian Mixture Models (GMMs) is a more appropriate 
-%     density function to model $b_j$:
-%     \[
-%         b_j(\boldsymbol x) = p(\boldsymbol x | q = j) = \sum_{m=1}^{M} c_{jm} \mathcal{N}(\boldsymbol x ; \boldsymbol \mu_{jm}, \boldsymbol \Sigma_{jm})
-%     \]
-%      $\boldsymbol \mu_j$ and $\boldsymbol \Sigma_j$ requires extending the concept of 
-%      state occupation probabilities to GMMs which we define as $\gamma_{jm} (t)$ (component state occupation) which 
-%      is the probability of occupying mixture component $m$ of state $j$ at time $t$.
-% }
-
-\wa{EM Algorithm (Baum-Welch) for HMM Training}{
-    The Baum-Welch algorithm is an instance of the Expectation-Maximization (EM) algorithm used to find the maximum likelihood estimate of the parameters ($\lambda = \{A, B, \pi\}$) of an HMM when the state sequence is unknown. It iteratively performs two steps:
+\wde{E-Step Probabilities for Baum-Welch}{
+    Calculated using $\alpha_j(t)$ and $\beta_j(t)$ from the Forward/Backward algorithms run with current parameters $\lambda^{\text{old}}$.
     \begin{itemize}
-        \item \textbf{E-step (Expectation):} Using the current parameter estimates $\lambda^{\text{old}}$, compute the expected values needed for the M-step. This involves:
+        \item \textbf{State Occupation Probability ($\gamma_j(t)$):} Prob. of being in state $j$ at time $t$, given $X$.
+            \[ \gamma_j(t) = P(q_t = j | X, \mathcal{M}^{\text{old}}) = \frac{\alpha_j(t) \beta_j(t)}{P(X|\mathcal{M}^{\text{old}})} = \frac{\alpha_j(t) \beta_j(t)}{\alpha_E} \]
+        \item \textbf{Transition Occupation Probability ($\xi_{ij}(t)$):} Prob. of transition $i \to j$ at time $t \to t+1$, given $X$.
+            
+        \begin{align*}
+        \xi_{ij}(t) = P(q_t = i, q_{t+1} &= j | X, \mathcal{M}^{\text{old}}) \\
+        &= \frac{\alpha_i(t) a_{ij}^{\text{old}} b_j^{\text{old}}(x_{t+1}) \beta_j(t+1)}{\alpha_E}
+        \end{align*}
+
+    \end{itemize}
+}
+
+\wa{Baum-Welch Algorithm Steps}{
+    Iteratively perform:
+    \begin{itemize}
+        \item \textbf{E-step:} Using $\lambda^{\text{old}}$, run Forward and Backward algorithms. Compute expected values: $\gamma_j(t)$ and $\xi_{ij}(t)$ for all $i, j, t$. If using GMMs, also compute $\gamma_{jm}(t)$ (see GMM section).
+        \item \textbf{M-step:} Update parameters $\lambda^{\text{new}}$ using the expectations from the E-step to maximize expected complete-data log-likelihood.
             \begin{itemize}
-                \item Computing forward probabilities $\alpha_j(t)$ $\forall j, t$.
-                \item Computing backward probabilities $\beta_j(t)$ $\forall j, t$.
-                \item Computing state occupation probabilities $\gamma_j(t)$ $\forall j, t$
-                \item Computing transition occupation probabilities $\xi_{ij}(t)$ $\forall i,j,t$
-                \item If using GMMs for $b_j$, compute component-state occupation probabilities $\gamma_{jm}(t)$ (see below).
+                \item \textbf{Update $a_{ij}$:}
+                    \[ \hat a_{ij}^{\text{new}} = \frac{\sum_{t=1}^{T-1} \xi_{ij}(t)}{\sum_{t=1}^{T-1} \gamma_i(t)} \]
+                    (Sum numerator/denominator over all utterances $r$ in a corpus).
+                \item \textbf{Update $b_j$ (Observation Probabilities):} See details below depending on model (Single Gaussian or GMM).
+                % \item \textbf{Update Initial Probabilities $\pi_i = a_{0i}$ (Optional):} $\hat{\pi}_i^{\text{new}} = \gamma_i(1)$
             \end{itemize}
-        \item \textbf{M-step (Maximization):} Update the parameters $\lambda^{\text{new}}$ to maximize the expected complete-data log-likelihood, using the expectations computed in the E-step. See specific update formulas below.
-        \item Repeat E-step and M-step until the parameters or the likelihood $P(X|\lambda)$ converge.
+        \item Repeat until convergence of parameters or likelihood $P(X|\lambda)$.
     \end{itemize}
 }
 
-% --- M-Step: Parameter Updates ---
-
-\wde{M-Step: Transition Probabilities ($a_{ij}$)}{
-    The transition probability $a_{ij}$ is updated as the expected number of transitions from state $i$ to $j$, divided by the expected total number of transitions *out* of state $i$.
-    \begin{align*}
-        \hat a_{ij}^{\text{new}} &= \frac{\text{Expected transitions } i \to j}{\text{Expected transitions out of } i} \\
-        &= \frac{\sum_{t=1}^{T-1} \xi_{ij}(t)}{\sum_{k=1}^{J} \sum_{t=1}^{T-1} \xi_{ik}(t)} = \frac{\sum_{t=1}^{T-1} \xi_{ij}(t)}{\sum_{t=1}^{T-1} \gamma_i(t)}
-    \end{align*}
-    For a corpus of $R$ utterances, sum the numerators and denominators over all utterances $r=1, \dots, R$.
-    % Optional: Add corpus formula if needed
-    % \begin{align*}
-    %     \hat a_{ij}^{\text{new}} &= \frac{\sum_{r=1}^{R} \sum_{t=1}^{T_r-1} \xi_{ij}^{r}(t)}{\sum_{r=1}^{R} \sum_{t=1}^{T_r-1} \gamma_i^{r}(t)}
-    % \end{align*}
-}
+% ==================================================
+% == Section 4: Observation Probability Models (GMMs) ==
+% ==================================================
 
 \wde{M-Step: Observation Probabilities ($b_j(\mathbf{x})$) [Single Gaussian]}{
-    If the observation probability for state $j$ is modeled by a single multivariate Gaussian $b_j(\mathbf{x}) = \mathcal{N}(\mathbf{x}; \boldsymbol{\mu}_j, \boldsymbol{\Sigma}_j)$, the parameters are updated using weighted maximum likelihood, where the weights are the state occupation probabilities $\gamma_j(t)$.
+    If $b_j(\mathbf{x}) = \mathcal{N}(\mathbf{x}; \boldsymbol{\mu}_j, \boldsymbol{\Sigma}_j)$, update using $\gamma_j(t)$ as weights:
     \begin{align*}
         \hat{\boldsymbol{\mu}}_j^{\text{new}} &= \frac{\sum_{t=1}^{T} \gamma_j(t) \mathbf{x}_t}{\sum_{t=1}^{T} \gamma_j(t)} \\
         \hat{\boldsymbol{\Sigma}}_j^{\text{new}} &= \frac{\sum_{t=1}^{T} \gamma_j(t) (\mathbf{x}_t - \hat{\boldsymbol{\mu}}_j^{\text{new}})(\mathbf{x}_t - \hat{\boldsymbol{\mu}}_j^{\text{new}})^T}{\sum_{t=1}^{T} \gamma_j(t)}
     \end{align*}
 }
 
-\wde{M-Step: Observation Probabilities ($b_j(\mathbf{x})$) [GMM]}{
-    If $b_j(\mathbf{x})$ is an M-component GMM, $b_j(\mathbf{x}) = \sum_{m=1}^{M} c_{jm} \mathcal{N}(\mathbf{x}; \boldsymbol{\mu}_{jm}, \boldsymbol{\Sigma}_{jm})$, we need the component-state occupation probability $\gamma_{jm}(t)$.
+\wde{Observation Probabilities with GMMs}{
+    A single Gaussian per state is often insufficient. Gaussian Mixture Models (GMMs) provide a more powerful density estimate for $b_j(\mathbf{x})$:
+    \[ b_j(\mathbf{x}) = p(\mathbf{x} | q = j) = \sum_{m=1}^{M} c_{jm} \mathcal{N}(\mathbf{x} ; \boldsymbol{\mu}_{jm}, \boldsymbol{\Sigma}_{jm}) \]
+    Training requires estimating parameters for each component $m$ within each state $j$.
+}
+
+\wde{Component-State Occupation Probability ($\gamma_{jm}(t)$)}{
+    Needed for training GMMs within HMMs. Calculated in the E-step. It's the probability of being in state $j$ and using component $m$ at time $t$, given $X$.
+    \begin{align*}
+        \gamma_{jm}(t) &= P(q_t = j, c_t = m | X, \mathcal{M}^{\text{old}}) \\
+        &= \gamma_j(t) \times \frac{c_{jm}^{\text{old}} \mathcal{N}(\mathbf{x}_t; \boldsymbol{\mu}_{jm}^{\text{old}}, \boldsymbol{\Sigma}_{jm}^{\text{old}})}{b_j^{\text{old}}(\mathbf{x}_t)} \\
+        &= \frac{\alpha_j(t) \beta_j(t)}{\alpha_E} \times \frac{c_{jm}^{\text{old}} \mathcal{N}(\mathbf{x}_t; \boldsymbol{\mu}_{jm}^{\text{old}}, \boldsymbol{\Sigma}_{jm}^{\text{old}})}{\sum_{k=1}^M c_{jk}^{\text{old}} \mathcal{N}(\mathbf{x}_t; \boldsymbol{\mu}_{jk}^{\text{old}}, \boldsymbol{\Sigma}_{jk}^{\text{old}})}
+    \end{align*}
+}
+
+\wde{M-Step: Observation Probabilities ($b_j(\mathbf{x})$) [GMM Updates]}{
+    Use $\gamma_{jm}(t)$ as weights to update parameters for component $m$ of state $j$.
     \begin{itemize}
-        \item \textbf{Component-State Occupation Probability ($\gamma_{jm}(t)$):} This is the probability of being in state $j$ and using component $m$ at time $t$, given $X$. It's calculated in the E-step after $\gamma_j(t)$:
-            \begin{align*}
-                \gamma_{jm}(t) &= P(q_t = j, c_t = m | X, \mathcal{M}^{\text{old}}) \\
-                &= \gamma_j(t) \times \frac{c_{jm}^{\text{old}} \mathcal{N}(\mathbf{x}_t; \boldsymbol{\mu}_{jm}^{\text{old}}, \boldsymbol{\Sigma}_{jm}^{\text{old}})}{b_j^{\text{old}}(\mathbf{x}_t)} \\
-                &= \frac{\alpha_j(t) \beta_j(t)}{\alpha_E} \times \frac{c_{jm}^{\text{old}} \mathcal{N}(\mathbf{x}_t; \boldsymbol{\mu}_{jm}^{\text{old}}, \boldsymbol{\Sigma}_{jm}^{\text{old}})}{\sum_{k=1}^M c_{jk}^{\text{old}} \mathcal{N}(\mathbf{x}_t; \boldsymbol{\mu}_{jk}^{\text{old}}, \boldsymbol{\Sigma}_{jk}^{\text{old}})}
-            \end{align*}
-        \item \textbf{GMM Parameter Updates (M-step):} Use $\gamma_{jm}(t)$ as weights for component $m$ of state $j$.
-            \begin{align*}
-                \hat{c}_{jm}^{\text{new}} &= \frac{\sum_{t=1}^{T} \gamma_{jm}(t)}{\sum_{k=1}^{M} \sum_{t=1}^{T} \gamma_{jk}(t)} = \frac{\sum_{t=1}^{T} \gamma_{jm}(t)}{\sum_{t=1}^{T} \gamma_j(t)} \\
-                \hat{\boldsymbol{\mu}}_{jm}^{\text{new}} &= \frac{\sum_{t=1}^{T} \gamma_{jm}(t) \mathbf{x}_t}{\sum_{t=1}^{T} \gamma_{jm}(t)} \\
-                \hat{\boldsymbol{\Sigma}}_{jm}^{\text{new}} &= \frac{\sum_{t=1}^{T} \gamma_{jm}(t) (\mathbf{x}_t - \hat{\boldsymbol{\mu}}_{jm}^{\text{new}})(\mathbf{x}_t - \hat{\boldsymbol{\mu}}_{jm}^{\text{new}})^T}{\sum_{t=1}^{T} \gamma_{jm}(t)}
-            \end{align*}
+        \item \textbf{Mixture Weights:}
+            \[ \hat{c}_{jm}^{\text{new}} = \frac{\sum_{t=1}^{T} \gamma_{jm}(t)}{\sum_{k=1}^{M} \sum_{t=1}^{T} \gamma_{jk}(t)} = \frac{\sum_{t=1}^{T} \gamma_{jm}(t)}{\sum_{t=1}^{T} \gamma_j(t)} \]
+        \item \textbf{Means:}
+            \[ \hat{\boldsymbol{\mu}}_{jm}^{\text{new}} = \frac{\sum_{t=1}^{T} \gamma_{jm}(t) \mathbf{x}_t}{\sum_{t=1}^{T} \gamma_{jm}(t)} \]
+        \item \textbf{Covariances:} (Update $\hat{\boldsymbol{\mu}}_{jm}^{\text{new}}$ first)
+            \[ \hat{\boldsymbol{\Sigma}}_{jm}^{\text{new}} = \frac{\sum_{t=1}^{T} \gamma_{jm}(t) (\mathbf{x}_t - \hat{\boldsymbol{\mu}}_{jm}^{\text{new}})(\mathbf{x}_t - \hat{\boldsymbol{\mu}}_{jm}^{\text{new}})^T}{\sum_{t=1}^{T} \gamma_{jm}(t)} \]
     \end{itemize}
+}
+
+% ==================================================
+% == Section 5: Context-Dependent Modelling ==
+% ==================================================
+
+\wde{Context-Dependent Phone Models: Motivation}{
+    Phonetic context significantly affects acoustic realization (coarticulation). E.g., /n/ in 'ten' vs 'tenth'.
+    Using context-independent models (monophones) ignores this, violating the Markov assumption (as the observation probability implicitly depends on more than the current state).
+    Context-dependent models aim to capture these variations.
+}
+
+\wde{Context-Dependent Units}{
+    \begin{itemize}
+        \item \textbf{Biphones:} Model depends on either the left or right context. (e.g., `s-ih`, `ih+k`).
+        \item \textbf{Triphones:} Model depends on both left and right context (e.g., `s-ih+k`). Notation: `l-x+r`. Triphones are most common.
+        \item \textbf{Word-Internal vs. Cross-Word Triphones:} Word-internal only consider context within a word boundary. Cross-word consider context across word boundaries (more accurate but many more potential triphones).
+    \end{itemize}
+    Using context increases the number of potential models drastically (e.g., $40^3 \approx 64,000$ potential triphones for 40 phones), leading to parameter explosion and data sparsity issues.
+}
+
+\wde{Handling Data Sparsity: Parameter Sharing / State Clustering}{
+    Since many context-dependent units (especially triphones) are rare or unseen in training data, sharing parameters between similar units is crucial.
+    \begin{itemize}
+        \item \textbf{Basic Idea:} Group acoustically similar context-dependent states together and force them to share the same output distribution (GMM). This allows pooling of training data.
+        \item \textbf{State Clustering:} The most common method. Cluster states corresponding to the same position within the phone HMM (e.g., all middle states of /iy/ triphones).
+        \item \textbf{Phonetic Decision Trees:} A top-down clustering approach.
+            \begin{itemize}
+                \item Build a separate tree for each state position of each monophone (e.g., middle state of /iy/).
+                \item Root node contains all triphone states for that position (e.g., all `l-iy+r` middle states).
+                \item At each node, find the phonetic question about the context (e.g., "Is left context a vowel?", "Is right context /l/?") that best splits the data (maximizes likelihood gain of the split clusters).
+                \item Questions are based on linguistic features (vowel, stop, nasal, place of articulation, etc.).
+                \item Continue splitting until likelihood gain is below a threshold or a leaf node has too little data.
+                \item All triphone states ending in the same leaf node are \textbf{tied} and share the same GMM parameters.
+            \end{itemize}
+    \end{itemize}
+}
+
+\wde{Training Pipeline with State Clustering}{
+    A common approach ("Mixing Up"):
+    \begin{enumerate}
+        \item Train context-independent monophone HMMs (using EM).
+        \item Clone monophone models to create initial context-dependent triphone models (unseen triphones might use monophone stats).
+        \item Run EM on triphone models. Accumulate statistics ($\gamma_j(t)$) for each triphone state.
+        \item Build phonetic decision trees using the accumulated statistics and phonetic questions to cluster/tie the triphone states. Assume single Gaussian output distributions during clustering for simplicity.
+        \item Initialize GMMs for the tied states (e.g., using pooled stats from single Gaussians).
+        \item Train the tied-state HMM/GMM system using EM (calculating $\gamma_{jm}(t)$ etc.).
+        \item Optionally, increase GMM complexity by splitting mixture components and retraining.
+    \end{enumerate}
+}
+
+% ==================================================
+% == Section 6: Large Vocabulary Decoding ==
+% ==================================================
+
+\wde{Decoding for Large Vocabulary Continuous Speech Recognition (LVCSR)}{
+    Finding $W^* = \arg \max_{W} p(X|W) P(W)$ involves searching a huge space.
+    \begin{itemize}
+        \item \textbf{Connected Words:} Requires transitions between word HMMs.
+        \item \textbf{Language Model Integration:} LM scores $P(W)$ (e.g., N-grams) are applied during the search, typically at word boundaries.
+        \item \textbf{Complexity Issues:} Large vocabulary $V$, context-dependent models (many states), and higher-order LMs (like trigrams requiring state duplication based on word history) make exact Viterbi search infeasible.
+    \end{itemize}
+}
+
+\wde{Efficient LVCSR Search Techniques}{
+    Approximate search methods are essential:
+    \begin{itemize}
+        \item \textbf{Beam Search Pruning:} At each time step $t$, discard paths whose score falls too far below the best path score. Keep only paths within a "beam" of the best score.
+            \[ V_j(t) > (\min_i V_i(t)) + \beta \quad \text{(Using log probabilities)} \]
+        \item \textbf{Tree-Structured Lexicon:} Organize the dictionary (pronunciations) as a tree, merging common phone prefixes (e.g., 'speak', 'spell', 'speech' share initial /s/ /p/). Reduces redundant computations during the search.
+        \item \textbf{Language Model Lookahead:} Used with tree lexicons. Pre-calculate the best possible LM score achievable from any node onwards in the tree. Use this estimate during search to adjust path scores and improve pruning decisions by considering future linguistic likelihood earlier.
+    \end{itemize}
+    Other techniques include multi-pass decoding, A* search, and WFST-based decoding (mentioned in passing).
 }
