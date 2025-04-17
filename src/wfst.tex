@@ -1,0 +1,38 @@
+\wde{WFST}{
+    It is an automaton that transduces an input sequence to an output sequence. State transitions has an input label, output label and a weight.
+}
+\wde{WFST Weights and Semirings}{
+    Weights belong to a mathematical structure called a \textbf{semiring}, which defines two operations: $\oplus$ ('plus', for combining weights of parallel paths) and $\otimes$ ('times', for combining weights along a single path).
+    \begin{itemize}
+        \item \textbf{Log Semiring:} Commonly used in ASR. Weights are negative log-probabilities.
+            \begin{itemize}
+                \item $w_1 \otimes w_2 = w_1 + w_2$ (corresponds to multiplying probabilities)
+                \item $w_1 \oplus w_2 = -\log(e^{-w_1} + e^{-w_2})$ (corresponds to adding probabilities, using log-sum-exp)
+            \end{itemize}
+        \item \textbf{Tropical Semiring:} Often used for finding the best path (like Viterbi). Weights are negative log-probabilities (or costs).
+            \begin{itemize}
+                \item $w_1 \otimes w_2 = w_1 + w_2$ (summing costs/log-probs along path)
+                \item $w_1 \oplus w_2 = \min(w_1, w_2)$ (corresponds to taking the max probability / min cost path)
+            \end{itemize}
+    \end{itemize}
+}
+
+\wde{Key WFST Algorithms}{
+    These operations allow manipulation and optimization of WFSTs:
+    \begin{itemize}
+        \item \textbf{Composition ($T_1 \circ T_2$):} Combines two transducers $T_1$ and $T_2$ into a single transducer $T$ that represents applying $T_1$ then $T_2$. An output path exists in $T$ if an output path from $T_1$ matches an input path in $T_2$. The path weight is the $\otimes$-sum of the corresponding path weights in $T_1$ and $T_2$.
+        \item \textbf{Determinization ($\det(T)$):} Creates an equivalent WFST where, for any given state, there is at most one outgoing transition for a specific input label. This is crucial for efficient processing but can cause size explosion. May require intermediate $\epsilon$ symbols.
+        \item \textbf{Minimization ($\min(T)$):} Creates the smallest possible equivalent WFST (fewest states and transitions) for a given determinized WFST.
+        \item \textbf{Weight Pushing:} Redistributes weights along paths towards the start state as much as possible without changing the total weight of any path. Useful for pruning.
+    \end{itemize}
+}
+\wde{ASR Decoding using WFSTs}{
+    The core components of ASR (Acoustic Model HMMs, Context-Dependency, Lexicon, Language Model Grammar) can each be represented as a Weighted Finite-State Transducer (WFST).
+    \begin{itemize}
+        \item \textbf{Components:} H (States $\to$ CD Phones), C (CD Phones $\to$ CI Phones), L (CI Phones $\to$ Words), G (Words $\to$ Words).
+        \item \textbf{Composition:} These are combined using the WFST composition operation ($\circ$) into a single, large search graph: $SearchGraph = H \circ C \circ L \circ G$. This graph maps low-level HMM state sequences to word sequences, integrating all knowledge sources.
+        \item \textbf{Optimization:} Direct composition is computationally infeasible ("blow-up"). To create a tractable graph, optimization algorithms like determinization ($\det$) and minimization ($\min$) are interleaved with composition, e.g.:
+            \[ HCLG = \min(\det(H \circ \min(\det(C \circ \min(\det(L \circ G)))))) \]
+        \item \textbf{Decoding:} Viterbi search (or similar) is performed on the final, optimized $HCLG$ graph to find the best path and corresponding word sequence efficiently.
+    \end{itemize}
+}

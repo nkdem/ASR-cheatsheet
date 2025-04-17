@@ -231,18 +231,17 @@
     \end{itemize}
 }
 
-\wde{Training Pipeline with State Clustering}{
-    A common approach ("Mixing Up"):
-    \begin{enumerate}
-        \item Train context-independent monophone HMMs (using EM).
-        \item Clone monophone models to create initial context-dependent triphone models (unseen triphones might use monophone stats).
-        \item Run EM on triphone models. Accumulate statistics ($\gamma_j(t)$) for each triphone state.
-        \item Build phonetic decision trees using the accumulated statistics and phonetic questions to cluster/tie the triphone states. Assume single Gaussian output distributions during clustering for simplicity.
-        \item Initialize GMMs for the tied states (e.g., using pooled stats from single Gaussians).
-        \item Train the tied-state HMM/GMM system using EM (calculating $\gamma_{jm}(t)$ etc.).
-        \item Optionally, increase GMM complexity by splitting mixture components and retraining.
-    \end{enumerate}
-}
+% \wde{Training Pipeline with State Clustering}{
+%     A common approach ("Mixing Up"):
+%     \begin{enumerate}
+%         \item Train context-independent monophone HMMs (using EM).
+%         \item Clone monophone models to create initial context-dependent triphone models (unseen triphones might use monophone stats).
+%         \item Run EM on triphone models. Accumulate statistics ($\gamma_j(t)$) for each triphone state.
+%         \item Build phonetic decision trees using the accumulated statistics and phonetic questions to cluster/tie the triphone states. Assume single Gaussian output distributions during clustering for simplicity.
+%         \item Initialize GMMs for the tied states (e.g., using pooled stats from single Gaussians).
+%         \item Train the tied-state HMM/GMM system using EM (calculating $\gamma_{jm}(t)$ etc.).
+%         \item Optionally, increase GMM complexity by splitting mixture components and retraining.
+%     \end{enumerate}
 
 % ==================================================
 % == Section 6: Large Vocabulary Decoding ==
