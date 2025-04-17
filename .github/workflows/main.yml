@@ -22,6 +22,9 @@ jobs:
       - name: Release
         uses: softprops/action-gh-release@v1
         with:
-          tag_name: latest
+          tag_name: v${{ github.run_number }}-${{ github.sha }}
           files: |
             main.pdf
+          prerelease: false
+          draft: false
+          overwrite: true
