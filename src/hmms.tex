@@ -214,34 +214,29 @@
     Using context increases the number of potential models drastically (e.g., $40^3 \approx 64,000$ potential triphones for 40 phones), leading to parameter explosion and data sparsity issues.
 }
 
-\wde{Handling Data Sparsity: Parameter Sharing / State Clustering}{
-    Since many context-dependent units (especially triphones) are rare or unseen in training data, sharing parameters between similar units is crucial.
+\wde{Handling Data Sparsity: Smoothing}{
+    Due to the inherent dilemma of richer model structures and available 
+    training data also known as Data Sparsity, there are various techniques 
+    to resort to. 
     \begin{itemize}
-        \item \textbf{Basic Idea:} Group acoustically similar context-dependent states together and force them to share the same output distribution (GMM). This allows pooling of training data.
-        \item \textbf{State Clustering:} The most common method. Cluster states corresponding to the same position within the phone HMM (e.g., all middle states of /iy/ triphones).
-        \item \textbf{Phonetic Decision Trees:} A top-down clustering approach.
-            \begin{itemize}
-                \item Build a separate tree for each state position of each monophone (e.g., middle state of /iy/).
-                \item Root node contains all triphone states for that position (e.g., all `l-iy+r` middle states).
-                \item At each node, find the phonetic question about the context (e.g., "Is left context a vowel?", "Is right context /l/?") that best splits the data (maximizes likelihood gain of the split clusters).
-                \item Questions are based on linguistic features (vowel, stop, nasal, place of articulation, etc.).
-                \item Continue splitting until likelihood gain is below a threshold or a leaf node has too little data.
-                \item All triphone states ending in the same leaf node are \textbf{tied} and share the same GMM parameters.
-            \end{itemize}
+        \item \textbf{Back-off}: The idea to is to use lower order models when 
+        there is insufficient training data for the higher order ones e.g. back-off from triphone to biphone etc.
+        \item \textbf{Interpolation}: Combine all models to have a weighted sum of the model. E.g. with a triphone model:
+        \[
+        \hat \lambda = \alpha_3 \lambda^{tri} + \alpha_2 \lambda^{bi} + \alpha_1 \lambda^{mono} 
+        \]
+        Estimate interplation parameters $\alpha$ with deleted interpolation
     \end{itemize}
 }
 
-% \wde{Training Pipeline with State Clustering}{
-%     A common approach ("Mixing Up"):
-%     \begin{enumerate}
-%         \item Train context-independent monophone HMMs (using EM).
-%         \item Clone monophone models to create initial context-dependent triphone models (unseen triphones might use monophone stats).
-%         \item Run EM on triphone models. Accumulate statistics ($\gamma_j(t)$) for each triphone state.
-%         \item Build phonetic decision trees using the accumulated statistics and phonetic questions to cluster/tie the triphone states. Assume single Gaussian output distributions during clustering for simplicity.
-%         \item Initialize GMMs for the tied states (e.g., using pooled stats from single Gaussians).
-%         \item Train the tied-state HMM/GMM system using EM (calculating $\gamma_{jm}(t)$ etc.).
-%         \item Optionally, increase GMM complexity by splitting mixture components and retraining.
-%     \end{enumerate}
+\wde{Handling Data Sparsity: Parameter Sharing}{
+    Explicitly share parameters or models across different contexts to pool training data and enable robust estimation for less frequent units. This combats data sparsity inherent in context-dependent modeling. Sharing can occur at different levels:
+    \begin{itemize}
+        \item \textbf{State Clustering (Tied States):} Groups acoustically similar context-dependent states (e.g., middle states of `l1-x+r1`, `l2-x+r2`) identified via phonetic decision trees based on context features. Tied states share identical output GMM parameters, allowing robust estimation from pooled data. This is the most common and effective method.
+        \item \textbf{Tied Mixtures (Sharing Gaussians):} States share a common pool (global 'codebook') of Gaussian components. Each state distribution then learns only its specific mixture weights, significantly reducing parameters compared to fully independent GMMs per state.
+        \item \textbf{Generalized Triphones (Sharing Models):} Merges entire HMM models (all states and transitions) for contexts judged acoustically similar (e.g., `(s,f)-iy+l` representing both `s-iy+l` and `f-iy+l`). Reduces the total number of distinct HMM models needed in the system.
+    \end{itemize}
+}
 
 % ==================================================
 % == Section 6: Large Vocabulary Decoding ==
