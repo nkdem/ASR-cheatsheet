@@ -1,3 +1,46 @@
-\wde{test}{
-    t
+\wde{Motivation and Hybrid Concept}{
+    While HMMs excel at sequence modeling, GMMs used for observation probabilities ($b_j(x_t) = p(x_t|q_t=j)$) have limitations: difficulty modeling feature correlations and complex distributions.
+    \textbf{Hybrid HMM/DNN systems} replace the GMM component with a Deep Neural Network (DNN), leveraging the DNN's strengths as a powerful classifier while retaining the HMM's sequence modeling capability.
+}
+
+\wde{DNN Role: Posterior Probability Estimation}{
+    The DNN is trained as a frame-level classifier:
+    \begin{itemize}
+        \item \textbf{Input:} Acoustic features for frame $t$ ($x_t$), typically augmented with context frames (e.g., $x_{t-k}, \dots, x_{t+k}$).
+        \item \textbf{Output Layer:} Softmax layer with $J$ outputs, where $J$ is the total number of HMM states being modeled.
+        \item \textbf{Training:} Using frame-level labels and a Cross-Entropy loss function.
+        \item \textbf{Output Interpretation:} The $j$-th output of the trained DNN for input $x_t$ approximates the \textbf{posterior probability} $P(q_t = j | x_t)$.
+    \end{itemize}
+}
+
+\wde{Connecting DNN Posteriors to HMM Likelihoods}{
+    HMM algorithms (Viterbi, Forward) require the likelihood $p(x_t | q_t = j)$. We can relate the DNN posterior to this via Bayes' theorem:
+    \[ P(q_t = j | x_t) = \frac{p(x_t | q_t = j) P(q_t = j)}{p(x_t)} \]
+    Rearranging gives the \textbf{scaled likelihood}:
+    \[ \frac{p(x_t | q_t = j)}{p(x_t)} = \frac{P(q_t = j | x_t)}{P(q_t = j)} \]
+    Since $p(x_t)$ is constant across states $j$ at time $t$, using this scaled likelihood as the observation probability $b_j(x_t)$ in HMM computations yields the correct relative path scores for decoding.
+    \begin{itemize}
+        \item $P(q_t = j | x_t)$ is the DNN output for state $j$.
+        \item $P(q_t = j)$ is the prior probability of state $j$, estimated from its frequency in the training data alignment.
+        \item The HMM observation probability is set as: $b_j(x_t) \propto \frac{P(q_t = j | x_t)}{P(q_t = j)}$.
+    \end{itemize}
+}
+
+\wde{Context-Dependent HMM/DNN Systems}{
+    To model phonetic context (like triphones) effectively:
+    \begin{enumerate}
+        \item \textbf{Obtain Tied States:} First, train a standard CD-HMM-GMM system using phonetic decision trees to create a set of tied context-dependent states (senones).
+        \item \textbf{Generate Frame Labels:} Use the trained CD-HMM-GMM system and Viterbi alignment to assign a tied-state label to each frame of the training data.
+        \item \textbf{Train DNN Classifier:} Train the DNN to classify input frames (with acoustic context) into these tied-state labels. The number of output units equals the number of tied states (typically thousands).
+        \item \textbf{Decoding:} Use the trained DNN to produce posterior probabilities $P(\text{tied\_state}_k | x_t)$. Divide by the tied-state priors $P(\text{tied\_state}_k)$ to get scaled likelihoods. Use these scaled likelihoods as observation probabilities in an HMM decoder whose topology is defined over the tied states.
+    \end{enumerate}
+    This approach allows the DNN to learn discriminative features for context-dependent units while leveraging the state tying defined by the robust HMM/GMM framework.
+}
+
+\wde{Advantages of HMM/DNN over HMM/GMM}{
+    \begin{itemize}
+        \item DNNs can model correlations between input features directly (e.g., use FBANK features without decorrelation).
+        \item Easily incorporate wide acoustic context via the input layer window.
+        \item Generally more discriminative and flexible than GMMs, leading to better acoustic modeling and lower Word Error Rates (WER).
+    \end{itemize}
 }
