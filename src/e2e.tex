@@ -1,0 +1,87 @@
+\wde{End-to-end Systems}{
+    End-to-end systems are systems which learn to directly map from 
+    an input sequence $X$ to an output sequence $Y$. Where HMMs 
+    are comprised of multiple components (acoustic model, language model, lexicon) 
+    that are optimised individually, fully end-to-end system optimise a 
+    \textbf{single} objective function, drastically simplifying the pipeline 
+    in developing ASR systems. This approach is commonly used in state-of-the-art 
+    ASR systems now.
+}
+
+\wde{Connectionist Temporal Classification (CTC)}{
+    An alignment-free approach for sequence-to-sequence tasks where input length $T$ is typically much larger than output length $M$ (e.g., speech frames to characters/phones). Uses a neural network (RNN/Transformer) to output frame-level probabilities $P_t(c_t|X)$ over target labels plus a special \textbf{blank token} ($\epsilon$).
+    \begin{itemize}
+        \item \textbf{Alignment Mapping ($\mathcal{B}$):} A many-to-one function maps frame-level output sequences $C$ (length $T$) to target sequences $Y$ (length $M \le T$) by first merging consecutive identical non-blank labels, then removing all $\epsilon$ blanks. E.g., $\mathcal{B}(a\epsilon\epsilon b b \epsilon c) = abc$.
+        \item \textbf{Properties:} Alignments are monotonic. Allows variable timing and avoids needing explicit segmentation.
+        \item \textbf{Conditional Independence Assumption:} The probability of a full alignment $C$ is calculated assuming frame outputs are independent given the input $X$: $P(C|X) = \prod_{t=1}^T P_t(c_t|X)$. The underlying NN (e.g., BiLSTM) aims to make $P_t(c_t|X)$ depend on the full $X$.
+        \item \textbf{Handling Repeats:} To output repeated characters (e.g., "hello"), the alignment $C$ must include $\epsilon$ between them (e.g., $h e l \epsilon l o$).
+    \end{itemize}
+}
+
+\wde{CTC Loss Function}{
+    Trains the NN to maximize the total probability of the correct target sequence $Y$, by summing over all possible frame-level alignments $C$ that map to $Y$ via the compression function $\mathcal{B}$.
+    Let $A(Y) = \{C | \mathcal{B}(C) = Y\}$ be the set of valid alignments for $Y$.
+    \[ P(Y|X) = \sum_{C \in A(Y)} P(C | X) = \sum_{C \in A(Y)} \prod_{t=1}^T P_t(c_t|X) \]
+    The CTC loss is the negative log likelihood: $\mathcal{L}_{CTC} = - \log P(Y|X)$.
+
+    This sum over alignments $P(Y|X)$ is computed efficiently using dynamic programming via the \textbf{CTC Forward Algorithm}.
+    First, define the expanded symbol sequence including blanks $Z = (\epsilon, s_1, \epsilon, s_2, \dots, \epsilon, s_M, \epsilon)$, with length $J = 2M + 1$. Let $z_j$ be the $j$-th symbol in $Z$.
+    The forward variable $\alpha_j(t)$ represents the total probability of all paths ending in symbol $z_j$ at time $t$.
+    \begin{itemize}
+        \item Initialisation:
+        \begin{align*}
+            \alpha_{1}(1) &= P_1(z_1=\epsilon | X) \\ % Prob of blank at t=1
+            \alpha_{2}(1) &= P_1(z_2=s_1 | X) \\ % Prob of first char at t=1
+            \alpha_{j}(1) &= 0 \quad \text{for } j > 2
+        \end{align*}
+        % Note: A slightly different initialization might be used depending on source,
+        % e.g., alpha_i(0)=1 for i=1, 0 otherwise, then start recursion at t=1.
+        % The one below matches the slide recursion structure better.
+        % Let's stick to the slide's initialization for consistency:
+        % \item Initialisation:
+        % \begin{align*}
+        %     \alpha_{1} (0) &= 1 \\ % Start in blank state at t=0
+        %     \alpha_{j} (0) &= 0 \quad \text{for } j > 1
+        % \end{align*}
+        \item Recursion ($t=2, \dots, T$; $j=1, \dots, J$):
+            \begin{itemize}
+                \item If $z_j = \epsilon$ or $z_j = z_{j-2}$ (current is blank or same as state before previous blank):
+                \[ \alpha_{j}(t) = (\alpha_{j-1}(t-1) + \alpha_{j}(t-1)) P_t(z_j | X) \]
+                (Can come from previous symbol $z_{j-1}$ or stay in $z_j$)
+                \item Otherwise ($z_j$ is a non-blank, different from $z_{j-2}$):
+                \[ \alpha_{j}(t) = (\alpha_{j-2}(t-1) + \alpha_{j-1}(t-1) + \alpha_{j}(t-1)) P_t(z_j | X) \]
+                (Can come from $z_{j-2}$, $z_{j-1}$, or stay in $z_j$)
+            \end{itemize}
+        \item Termination: The total probability $P(Y|X)$ is the sum of probabilities ending in the last blank state ($z_J$) or the last actual symbol state ($z_{J-1}$) at the final time step $T$.
+        \[ P(Y|X) = \alpha_{J-1}(T) + \alpha_{J}(T) \]
+    \end{itemize}
+    (Note: Gradient calculation for training involves a similar backward pass).
+}
+
+\wde{CTC Decoding/Inference}{
+    Goal: Find the most likely output sequence $Y^* = \arg\max_Y P(Y|X)$.
+    \begin{itemize}
+        \item \textbf{Simple Greedy/Viterbi is Suboptimal:} Finding the single best frame-level alignment $C^* = \arg\max_C \prod_t P_t(c_t|X)$ and compressing it ($\mathcal{B}(C^*)$) is easy but often incorrect. As noted in the lectures (Slide 30), this $C^*$ might not correspond to the $Y$ with the highest total probability $P(Y|X)$, because $P(Y|X)$ requires summing over *all* valid alignments $C \in A(Y)$.
+        \item \textbf{Beam Search Decoding:} Standard approach to approximate $\arg\max_Y P(Y|X)$. Maintain a beam of candidate output prefixes $Y_{prefix}$. At each time step $t$:
+            \begin{itemize}
+                \item Extend existing prefixes with new characters (non-blank or blank) using $P_t(c_t|X)$.
+                \item \textbf{Merge Probabilities:} Crucially, add probabilities for hypotheses that result in the \textit{same output prefix} after applying $\mathcal{B}$.
+                \item Prune hypotheses outside the beam width.
+            \end{itemize}
+    \end{itemize}
+}
+
+\wde{Incorporating a Language Model with CTC}{
+    CTC's conditional independence assumption means an external LM is usually needed. The common approach integrates the LM during decoding (often called \textbf{Shallow Fusion}):
+    \begin{itemize}
+        \item \textbf{Combined Score:} During beam search, the score for a word sequence $W$ (corresponding to sub-word sequence $Y$) is calculated by interpolating the CTC log probability and the LM log probability:
+            \begin{multline*}
+             \hat{W} = \argmax_{W} \bigl( \log P_{CTC}(Y|X) 
+                    + \lambda \log P_{LM}(W) + \eta L(W) \bigr)
+            \end{multline*}
+            (Where $L(W)$ is often word count for length bonus).
+        \item \textbf{Parameters:} $\lambda$ (LM weight) and $\eta$ (word insertion bonus) are tuned on a development set.
+        \item \textbf{Application:} The LM score $\log P_{LM}(W)$ is typically added when a complete word is hypothesized or incrementally as sub-word units are added during the beam search.
+        \item \textbf{Alternative:} WFSTs can also be used by creating a CTC topology transducer (T) and composing $T \circ L \circ G$.
+    \end{itemize}
+}
