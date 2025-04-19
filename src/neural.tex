@@ -44,3 +44,19 @@
         \item Generally more discriminative and flexible than GMMs, leading to better acoustic modeling and lower Word Error Rates (WER).
     \end{itemize}
 }
+
+\wde{Advanced NN Architectures for Acoustic Context}{
+    Standard DNNs use a fixed input window. More advanced architectures model temporal dynamics better:
+    \begin{itemize}
+        \item \textbf{Time-Delay NN (TDNN):} Each hidden layer takes input from a time window of the *previous* layer, widening the receptive field over the original input in higher layers. Can be viewed as 1D convolution over time with tied weights. Uses \textbf{sub-sampling} (skipping frames in context) for efficiency.
+        \item \textbf{Recurrent NN (RNN):} Hidden state $h_t$ depends on current input $x_t$ and previous state $h_{t-1}$ ($h_t = f(W_{xh}x_t + W_{hh}h_{t-1} + b_h)$). Maintains internal memory/state. Trained via BPTT. Simple RNNs suffer from vanishing gradients.
+        \item \textbf{Long Short-Term Memory (LSTM):} Type of RNN unit designed to capture long-range dependencies. Uses an internal \textbf{cell state} ($c_t$) and three \textbf{gates} (Input $I_t$, Forget $F_t$, Output $O_t$) to control information flow (what to remember, forget, output). Mitigates vanishing gradients.
+            % Optional: Add LSTM equations if space permits
+            % $c_t = F_t \circ c_{t-1} + I_t \circ g(t)$
+            % $h_t = O_t \circ \tanh(c_t)$
+        \item \textbf{Bidirectional RNN/LSTM:} Processes sequence forward and backward with separate layers. Output depends on past and future context.
+        \item \textbf{Deep RNN/LSTM:} Stacks multiple recurrent layers vertically for hierarchical temporal feature learning.
+        \item \textbf{Convolutional NN (CNN):} Applies filters across time and frequency. Good for local spectro-temporal patterns. Often used in early layers.
+        \item \textbf{Transformers:} Use \textbf{self-attention} mechanism to weigh importance of different input frames. Excellent for long-range dependencies. Requires positional encoding. Basis of many end-to-end models (state-of-the-art)
+    \end{itemize}
+}
