@@ -1,0 +1,43 @@
+% ==================================================
+% == Section X: Speaker Adaptation ==
+% ==================================================
+
+\wde{Difficulty with ASR}{
+    ASR models face variability from speaker differences (anatomy, accent, style) and channel conditions (microphone type, recording setting [windy, reveberant, etc.])
+    \begin{itemize}
+        \item \textbf{SI (Speaker Independent):} Trained on many speakers, general but suboptimal for specific users.
+        \item \textbf{SD (Speaker Dependent):} Trained on one speaker, high accuracy but needs lots of speaker data.
+        \item \textbf{SA (Speaker Adaptive):} Goal is to adapt an SI model using a *small* amount of speaker-specific data to achieve near-SD performance.
+    \end{itemize}
+    Adaptation primarily targets the Acoustic Model to reduce mismatch between trained models and test data.
+}
+
+\wde{General Approaches to Adaptation}{
+    \begin{itemize}
+        \item \textbf{Model-Based Adaptation:} Modify parameters of the SI model (HMM/GMM or HMM/NN). E.g., MAP, MLLR, LHUC.
+        \item \textbf{Speaker/Feature Normalization:} Transform input features $x_t$ to match typical SI training data. E.g., VTLN, cMLLR/fMLLR.
+        \item \textbf{Speaker Space Methods:} Model the space of speakers; represent new speaker within this space. E.g., i-vectors, Eigenvoices.
+    \end{itemize}
+    % Optional: Add modes (supervised/unsupervised, static/dynamic) if space permits.
+}
+
+\wde{Adaptation for HMM/GMM Systems}{
+    Classic techniques focus on adapting GMM parameters:
+    \begin{itemize}
+        \item \textbf{MAP (Max. a Posteriori):} Balances SI parameters ($\mu_0$) and adaptation data estimates using factor $\tau$. $\hat{\mu} = (\tau\mu_0 + \sum \gamma x_t) / (\tau + \sum \gamma)$. Adapts only seen components.
+        \item \textbf{MLLR (Max. Likelihood Linear Regression):} Learns a shared linear transform $\hat{\mu} = A\mu + b$ for Gaussian means across regression classes. More robust with sparse data than MAP.
+        \item \textbf{cMLLR / fMLLR (Constrained MLLR):} Uses one transform for means and variances, equivalent to transforming features: $A'x_n + b'$. Useful for feature normalization.
+        \item \textbf{SAT (Speaker Adaptive Training):} Improves the SI model by estimating/applying speaker transforms (e.g., MLLR) during the training phase itself.
+    \end{itemize}
+}
+
+\wde{Adaptation for Hybrid HMM/DNN Systems}{
+    Adapting the DNN part of hybrid systems:
+    \begin{itemize}
+        \item \textbf{Feature Transformation (via cMLLR):} Estimate cMLLR transform using an auxiliary HMM/GMM system; apply transform to features before feeding into the fixed SI DNN.
+        \item \textbf{Linear Input Network (LIN):} Add an adaptable linear layer at the DNN input. Freeze main DNN, adapt only LIN layer for new speaker.
+        \item \textbf{Auxiliary Speaker Inputs (i-vectors):} Extract a compact speaker representation (e.g., i-vector $\lambda_u$) and feed it as an additional input to the DNN, allowing it to condition on speaker identity. Effective for unseen speakers.
+        \item \textbf{LHUC (Learning Hidden Unit Contributions):} Learn speaker-specific scalar weights to modulate the activation of each hidden unit in the DNN.
+    \end{itemize}
+    Note: Methods like i-vectors and LHUC can often be combined effectively with feature transforms like cMLLR.
+}
