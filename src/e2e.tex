@@ -85,3 +85,16 @@
         \item \textbf{Alternative:} WFSTs can also be used by creating a CTC topology transducer (T) and composing $T \circ L \circ G$.
     \end{itemize}
 }
+
+\wde{RNN Transducer (RNN-T)}{
+    \begin{itemize}
+        \item \textbf{Motivation:} CTC assumes output labels are independent given the input $X$, limiting its ability to learn output dependencies (like an LM).
+        \item \textbf{Architecture:} Uses three components:
+            \begin{itemize}
+                \item \textbf{Encoder (AM):} Maps acoustic input $X \to h^{enc}$ (like CTC).
+                \item \textbf{Prediction Net (Implicit LM):} RNN using previous output label $y_{u-1}$ to predict next label context $p_u$.
+                \item \textbf{Joint Net:} Combines $h^{enc}_t$ and $p_u$ to predict the probability $P(k|t,u)$ of the next output label $k$ (incl. blank $\epsilon$).
+            \end{itemize}
+        \item \textbf{Key Difference:} Output probability depends on both acoustic context ($t$) and previous output label context ($u$), allowing it to learn local output dependencies.
+    \end{itemize}
+}
