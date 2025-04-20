@@ -98,3 +98,77 @@
         \item \textbf{Key Difference:} Output probability depends on both acoustic context ($t$) and previous output label context ($u$), allowing it to learn local output dependencies.
     \end{itemize}
 }
+\wde{Attention Encoder-Decoder (AED) Models}{
+    Sequence-to-sequence models (e.g., Google's Listen, Attend, Spell) that address limitations of CTC/RNN-T's strict monotonic alignment.
+    \begin{itemize}
+        \item \textbf{Motivation:} CTC and RNN-T enforce a frame-by-frame or near-monotonic alignment between input and output, which can be restrictive for tasks where output timing isn't strictly tied to input timing (e.g., non-speech seq2seq tasks). AED allows flexible, non-monotonic alignments by letting the model decide which input parts to focus on for each output.
+        \item \textbf{Architecture:} Encoder (RNN/Transformer) processes input $X \to h^{enc}$, capturing the full utterance context. Decoder (RNN) generates output $Y = (y_1..y_U)$ step-by-step.
+        \item \textbf{Attention Mechanism (Key Innovation):} At each decoder step $u$, attention computes weights $\alpha_{ut}$ over all encoder states $h^{enc}_t$ based on the current decoder state $h^{dec}_u$. A context vector $c_u = \sum_t \alpha_{ut} h^{enc}_t$ summarizes relevant input parts for predicting $y_u$. $P(y_u | X, y_{<u})$ depends on $h^{dec}_u$ and $c_u$.
+        \item \textbf{Pros/Cons:} Offers flexible alignment and implicitly integrates an LM in the decoder. Can be less robust for strict monotonic tasks like ASR without regularization (e.g., CTC loss). Often slower to decode due to autoregressive nature.
+        \item \textbf{Hybrid CTC/Attention:} Jointly training with CTC loss on the encoder acts as a regularizer, encouraging more monotonic alignments typical in speech, often improving performance and robustness.
+    \end{itemize}
+}
+
+\wde{Self-Supervised Learning (SSL) for Speech}{
+    Leverages vast amounts of \textbf{unlabeled} audio data to learn powerful speech representations via \textbf{pretext tasks}, reducing reliance on expensive labeled data.
+    \begin{itemize}
+        \item \textbf{Motivation:} Transcribed speech data is scarce and costly to obtain, limiting supervised training. SSL pre-trains models on unlabeled audio (abundant) to learn general-purpose representations capturing phonetics, prosody, speaker traits, and even some linguistic structure, which can then be adapted to specific tasks with minimal labeled data.
+        \item \textbf{Pretext Tasks (How it Learns):}
+            \begin{itemize}
+                \item \textbf{Contrastive (e.g., CPC, wav2vec 2.0):} Train model to distinguish correct future or masked representations from negative samples (distractors). For wav2vec 2.0, a CNN+Transformer processes masked input, predicting quantized targets for masked frames via contrastive loss.
+                \item \textbf{Predictive (e.g., HuBERT):} Train model to predict discrete target units (e.g., k-means clusters of MFCCs or prior model features) for masked input frames using cross-entropy loss. Simpler than contrastive, focuses on pseudo-phonetic content.
+            \end{itemize}
+        \item \textbf{Usage (Why it's Powerful):}
+            \begin{itemize}
+                \item \textbf{Fine-tuning:} Pre-train on unlabeled data (e.g., 1000s of hours), then fine-tune the model (or add a small task-specific head like CTC) on a small labeled dataset for ASR or other tasks. Achieves state-of-the-art results with less labeled data than supervised approaches.
+                \item \textbf{Feature Extraction:} Use embeddings from specific layers of pre-trained SSL models (e.g., HuBERT) as rich input features for downstream models. Different layers often capture different information (low layers: acoustics, high layers: linguistic).
+                \item \textbf{Probing:} Analyze what SSL models learn by training simple classifiers on their features to detect phones, words, or semantics, revealing hierarchical knowledge.
+            \end{itemize}
+        \item \textbf{Impact:} SSL models like wav2vec 2.0 and HuBERT are essential for modern ASR, enabling high performance in low-resource settings and serving as pre-trained system components
+    \end{itemize}
+}
+
+\wde{ASR with Large Language Models (LLMs)}{
+    Leverages powerful pre-trained text-based LLMs (e.g., BERT, GPT) for speech tasks, capitalizing on their vast linguistic knowledge.
+    \begin{itemize}
+        \item \textbf{Motivation:} E2E models (CTC, RNN-T, AED) integrate AM and LM implicitly but may not match the linguistic modeling power of text-only LLMs trained on massive datasets. LLMs can enhance ASR accuracy, especially for rare words or complex language, and enable multi-task capabilities.
+        \item \textbf{Decoder-Only ASR:} Treat ASR as conditional language modeling. Use a fixed pre-trained acoustic encoder (e.g., HuBERT) to extract features $h^{enc}$. Project/compress $h^{enc}$ into a shorter sequence $H$ compatible with LLM text embeddings (via discrete units from SSL, CTC compression, or downsampling). Prepend $H$ to the input of a text LLM decoder, which generates transcript $Y$ autoregressively, conditioned on $H$.
+        \item \textbf{Instruction Tuning \& Zero-Shot ASR:} Use prompts (e.g., "Transcribe this audio:") with acoustic embedding $H$ to guide an instruction-tuned LLM for zero-shot ASR or related tasks (translation, summarization) without task-specific fine-tuning.
+        \item \textbf{ASR Error Correction:} Use an LLM to post-process and correct transcripts from a primary ASR system with prompts like "Correct this transcription:". Improves accuracy, especially for domain-specific terms if context (e.g., glossaries) is provided.
+    \end{itemize}
+}
+
+\wde{Choosing the Right ASR Approach}{
+    Selecting between HMM-based, End-to-End (E2E), and LLM-enhanced systems depends on task requirements, data availability, and computational resources:
+    \begin{itemize}
+        \item \textbf{HMM-based (HMM/GMM, HMM/DNN):} Use for well-understood, controlled domains with sufficient labeled data and need for interpretability (e.g., modular AM/LM). Best for legacy systems or when fine-grained control over components (e.g., adaptation via MLLR) is needed. Less effective with limited data or complex language.
+        \item \textbf{End-to-End (CTC, RNN-T, AED):} Preferred for modern ASR with large labeled datasets. Simplifies pipeline (single model), excels in diverse, noisy conditions, and integrates AM/LM implicitly. CTC/RNN-T better for streaming (low latency); AED for tasks needing flexible alignment. Requires significant data and compute.
+        \item \textbf{SSL + Fine-tuning (e.g., wav2vec 2.0, HuBERT):} Ideal for low-resource scenarios. Pre-train on unlabeled audio, fine-tune on small labeled data. Achieves state-of-the-art with less supervision. Use when labeled data is scarce or for transfer learning to new languages/domains.
+        \item \textbf{LLM-enhanced ASR:} Use for highest accuracy, especially with rare words, complex language, or multi-task needs (transcription + translation). Best when paired with strong acoustic encoders (SSL-based) and for error correction in specialized domains (e.g., medical, legal) with context. High compute cost, often non-streaming.
+    \end{itemize}
+}
+
+% ==================================================
+% == Section 11: Multilingual & Low-Resource ASR ==
+% ==================================================
+
+\wde{Low-Resource Challenges}{
+    Most languages lack labeled audio, text, lexica, expertise. Issues:
+    \begin{itemize}
+        \item \textbf{Data Scarcity:} Limits robust training.
+        \item \textbf{Morphology:} Rich languages have huge vocabularies, high OOV rates.
+        \item \textbf{Code-Switching:} Mixing languages in utterances.
+        \item \textbf{Lexicon:} Hard to create pronunciation dictionaries.
+    \end{itemize}
+}
+
+\wde{Solutions for Low-Resource ASR}{
+    \begin{itemize}
+        \item \textbf{Subword Units:} Use morphs, BPE, WordPiece to reduce vocabulary, handle OOV (Tools: Morfessor, SentencePiece).
+        \item \textbf{Multilingual Models:} Share layers/features across languages (e.g., Block Softmax, bottleneck features).
+        \item \textbf{Cross-lingual SSL:} Pre-train on multilingual unlabeled audio (e.g., XLSR, Whisper), fine-tune on small target data.
+        \item \textbf{Semi-Supervised:} Use seed model to transcribe unlabeled data, retrain with care (confidence scores, MMI).
+        \item \textbf{Grapheme/Subword E2E:} Output characters/subwords directly, avoiding lexica (CTC, RNN-T, AED).
+        \item \textbf{Zero-Resource Goal:} ASR with no labeled data via unsupervised unit discovery (wav2vec-U) or cross-lingual mapping.
+    \end{itemize}
+}
